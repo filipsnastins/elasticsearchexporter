@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -31,8 +32,6 @@ import (
 	"go.opentelemetry.io/collector/model/pdata"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-
-	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal/sanitize"
 )
 
 type esClientCurrent = elasticsearch7.Client
@@ -55,6 +54,12 @@ type elasticsearchExporter struct {
 var retryOnStatus = []int{500, 502, 503, 504, 429}
 
 const createAction = "create"
+
+// From internals/coreinternals/sanitize
+func sanitizeString(unsanitized string) string {
+	escaped := strings.Replace(unsanitized, "\n", "", -1)
+	return strings.Replace(escaped, "\r", "", -1)
+}
 
 func newExporter(logger *zap.Logger, cfg *Config) (*elasticsearchExporter, error) {
 	if err := cfg.Validate(); err != nil {
@@ -178,7 +183,7 @@ func (cl *clientLogger) LogRoundTrip(requ *http.Request, resp *http.Response, er
 	switch {
 	case err == nil && resp != nil:
 		zl.Debug("Request roundtrip completed.",
-			zap.String("path", sanitize.String(requ.URL.Path)),
+			zap.String("path", sanitizeString(requ.URL.Path)),
 			zap.String("method", requ.Method),
 			zap.Duration("duration", dur),
 			zap.String("status", resp.Status))
